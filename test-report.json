@@ -1,0 +1,108 @@
+{
+  "summary": {
+    "total": 9,
+    "passed": 8,
+    "failed": 1,
+    "successRate": "88.89%"
+  },
+  "tests": [
+    {
+      "test": "Create Developer",
+      "success": true,
+      "message": "Developer created with ID: 8",
+      "data": {
+        "name": "Test Developer Auto",
+        "slug": "test-developer-auto-1756785717579",
+        "description": "Auto-created test developer for system testing",
+        "location": "Dubai, UAE",
+        "established": "2024",
+        "website": "https://testdev.com",
+        "email": "test@testdev.com",
+        "phone": "+971-50-123-4567"
+      },
+      "timestamp": "2025-09-02T04:01:58.047Z"
+    },
+    {
+      "test": "Create Project with Developer",
+      "success": true,
+      "message": "Project created with ID: 6",
+      "data": {
+        "name": "Test Project with Developer",
+        "description": "Test project to verify developer assignment",
+        "location": "Dubai Marina",
+        "price": "2500000",
+        "bedrooms": 3,
+        "bathrooms": 4,
+        "area": "2200",
+        "developer_id": 8,
+        "slug": "test-project-with-developer-1756785718049",
+        "developer": "Test Developer Auto"
+      },
+      "timestamp": "2025-09-02T04:01:58.520Z"
+    },
+    {
+      "test": "Auto-Create Developer",
+      "success": true,
+      "message": "Developer auto-created (ID: 9) and project created (ID: 7)",
+      "data": {
+        "developer": "Auto Created Developer 1756785718521"
+      },
+      "timestamp": "2025-09-02T04:01:59.928Z"
+    },
+    {
+      "test": "Foreign Key Constraint",
+      "success": true,
+      "message": "Foreign key constraint working - prevented invalid developer_id",
+      "data": null,
+      "timestamp": "2025-09-02T04:02:00.162Z"
+    },
+    {
+      "test": "Relationship Integrity",
+      "success": true,
+      "message": "Found 2 valid relationships, 0 broken relationships",
+      "data": {
+        "valid": 2,
+        "broken": 0
+      },
+      "timestamp": "2025-09-02T04:02:00.628Z"
+    },
+    {
+      "test": "Cascading Deletion",
+      "success": true,
+      "message": "Cascading deletion working - 1 projects deleted with developer",
+      "data": {
+        "before": 1,
+        "after": 0
+      },
+      "timestamp": "2025-09-02T04:02:01.788Z"
+    },
+    {
+      "test": "Data Integrity",
+      "success": false,
+      "message": "Failed to check data integrity: Unknown column 'p.title' in 'field list'",
+      "data": null,
+      "timestamp": "2025-09-02T04:02:02.035Z"
+    },
+    {
+      "test": "Admin Developers API",
+      "success": true,
+      "message": "Developers API returned 200",
+      "data": {
+        "status": 200,
+        "count": 0
+      },
+      "timestamp": "2025-09-02T04:02:03.473Z"
+    },
+    {
+      "test": "Admin Projects API",
+      "success": true,
+      "message": "Projects API returned 200",
+      "data": {
+        "status": 200,
+        "count": 0
+      },
+      "timestamp": "2025-09-02T04:02:03.953Z"
+    }
+  ],
+  "timestamp": "2025-09-02T04:02:04.882Z"
+}

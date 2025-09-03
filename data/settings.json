@@ -1,0 +1,23 @@
+{
+  "siteName": "Premium Choice Real Estate",
+  "siteDescription": "Luxury Real Estate in Dubai",
+  "contactEmail": "admin@pcrealestate.ae",
+  "contactPhone": "+971564986660",
+  "address": "Dubai, UAE",
+  "socialMedia": {
+    "facebook": "",
+    "instagram": "https://www.instagram.com/pcrealestate.ae",
+    "twitter": "",
+    "linkedin": ""
+  },
+  "seo": {
+    "metaTitle": "Premium Choice Real Estate - Luxury Properties in Dubai",
+    "metaDescription": "Discover luxury real estate properties in Dubai with Premium Choice. Expert guidance for your dream home.",
+    "keywords": "Dubai real estate, luxury properties, premium homes"
+  },
+  "theme": {
+    "primaryColor": "#1a1a1a",
+    "secondaryColor": "#10b981",
+    "accentColor": "#f3f4f6"
+  }
+}
