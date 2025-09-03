@@ -1,7 +1,7 @@
 {
   "/page": "app/page.js",
-  "/api/admin/video-settings/route": "app/api/admin/video-settings/route.js",
+  "/expert/page": "app/expert/page.js",
+  "/api/expert/route": "app/api/expert/route.js",
   "/api/admin/settings/route": "app/api/admin/settings/route.js",
-  "/api/projects/route": "app/api/projects/route.js",
   "/_not-found/page": "app/_not-found/page.js"
 }

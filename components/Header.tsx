@@ -29,6 +29,7 @@ export default function Header() {
     { name: 'Projects', href: '/projects' },
     { name: 'Developers', href: '/developers' },
     { name: 'Articles', href: '/articles' },
+    { name: 'AI-Expert', href: '/expert' },
     { name: 'Contact', href: '/contact' },
   ]
 
