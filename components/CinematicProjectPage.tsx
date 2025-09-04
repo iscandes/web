@@ -456,7 +456,7 @@ export default function CinematicProjectPage({ projectSlug }: CinematicProjectPa
                 console.log('Video failed to load, but not attempting alternative formats to avoid 404 errors');
               }}
             >
-              {getVideoSource() && <source src={getVideoSource()} type="video/mp4" />}
+              {getVideoSource() && <source src={getVideoSource() || ''} type="video/mp4" />}
               Your browser does not support the video tag.
             </video>
           </div>

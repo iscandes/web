@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       { 
         success: false, 
         message: 'An unexpected error occurred while sending test email.',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined
       },
       { status: 500 }
     );

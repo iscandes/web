@@ -677,7 +677,7 @@ export default function DevelopersContent({ developers, onUpdate }: DevelopersCo
                     )}
                   </div>
 
-                  {(formData.projects_count > 0 || editingDeveloper) && (
+                  {((formData.projects_count && formData.projects_count > 0) || editingDeveloper) && (
                     <div>
                       <label className="block text-white font-medium mb-2">
                         Projects Count

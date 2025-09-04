@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Frontend Test</title>
+</head>
+<body>
+    <h1>Testing Admin API Frontend</h1>
+    <div id="results"></div>
+    
+    <script>
+        async function testAdminAPI() {
+            const resultsDiv = document.getElementById('results');
+            
+            try {
+                console.log('🔍 Testing /api/admin/projects...');
+                const response = await fetch('/api/admin/projects');
+                console.log('📡 Response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('📊 Projects data:', data);
+                    
+                    resultsDiv.innerHTML = `
+                        <h2>✅ API Response Success</h2>
+                        <p><strong>Status:</strong> ${response.status}</p>
+                        <p><strong>Projects found:</strong> ${data.projects ? data.projects.length : 'No projects array'}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    console.error('❌ API Error:', response.status, response.statusText);
+                    resultsDiv.innerHTML = `
+                        <h2>❌ API Error</h2>
+                        <p>Status: ${response.status} ${response.statusText}</p>
+                    `;
+                }
+            } catch (error) {
+                console.error('💥 Fetch Error:', error);
+                resultsDiv.innerHTML = `
+                    <h2>💥 Network Error</h2>
+                    <p>${error.message}</p>
+                `;
+            }
+        }
+        
+        // Test immediately when page loads
+        testAdminAPI();
+        
+        // Also test localStorage functionality
+        console.log('🔧 Testing localStorage...');
+        localStorage.setItem('admin_refresh_needed', 'true');
+        console.log('✅ localStorage flag set');
+    </script>
+</body>
+</html>
