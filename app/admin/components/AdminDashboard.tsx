@@ -13,6 +13,15 @@ import AIApiControlContent from './AIApiControlContent';
 import SocialMediaContent from './SocialMediaContent';
 import { Project, Developer, Article, MediaFile } from '../../../lib/mysql-database';
 
+interface Activity {
+  id: number;
+  timestamp: string;
+  level: string;
+  category: string;
+  message: string;
+  details?: string;
+}
+
 interface AdminDashboardProps {
   onLogout: () => void;
 }
@@ -27,6 +36,7 @@ const NAV_ITEMS = [
   { id: 'media', label: 'Media', icon: '📁', description: 'File and media management' },
   { id: 'social-media', label: 'Social Media', icon: '🌐', description: 'Manage social media links' },
   { id: 'video-settings', label: 'Video Settings', icon: '🎬', description: 'Manage landing page video' },
+
   { id: 'ai-api-control', label: 'AI API Control', icon: '🤖', description: 'AI settings and controls' },
 ];
 
@@ -48,6 +58,7 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [articles, setArticles] = useState<Article[]>([]);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [settings, setSettings] = useState<any>(null);
+  const [activities, setActivities] = useState<Activity[]>([]);
 
 
 
@@ -175,6 +186,20 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
     }
   }, [settings]);
 
+  const loadActivities = useCallback(async () => {
+    try {
+      // Fetch frontend-only activities (projects, developers, articles, media)
+      const response = await fetch('/api/admin/activities?frontend=true&limit=10');
+      const data = await response.json();
+      if (data.success) {
+        setActivities(data.data);
+      }
+    } catch (error) {
+      // Silently handle errors to prevent console spam during development
+      setActivities([]);
+    }
+  }, []);
+
   // Optimized data loading based on active tab
   const loadData = useCallback(async (forceRefresh = false) => {
     setLoading(true);
@@ -191,7 +216,8 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
         setTimeout(() => {
           Promise.all([
             loadArticles(),
-            loadMedia()
+            loadMedia(),
+            loadActivities()
           ]);
         }, 100);
       } else {
@@ -309,6 +335,7 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
           developers={developers} 
           articles={articles} 
           mediaFiles={mediaFiles} 
+          activities={activities}
           loadingStates={loadingStates}
         />;
       case 'projects':
@@ -324,11 +351,12 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
         return <SocialMediaContent onUpdate={loadData} />;
       case 'video-settings':
         return <VideoSettingsContent onUpdate={loadData} />;
+
       case 'ai-api-control':
         return <AIApiControlContent />;
 
       default:
-        return <OverviewContent projects={projects} developers={developers} articles={articles} mediaFiles={mediaFiles} />;
+        return <OverviewContent projects={projects} developers={developers} articles={articles} mediaFiles={mediaFiles} activities={activities} />;
     }
   };
 
@@ -441,11 +469,12 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
 
 // Content Components
 // Dashboard Overview Content
-function OverviewContent({ projects, developers, articles, mediaFiles, loadingStates }: {
+function OverviewContent({ projects, developers, articles, mediaFiles, activities, loadingStates }: {
   projects: Project[];
   developers: Developer[];
   articles: Article[];
   mediaFiles: MediaFile[];
+  activities: Activity[];
   loadingStates?: {
     projects: boolean;
     developers: boolean;
@@ -589,29 +618,75 @@ function OverviewContent({ projects, developers, articles, mediaFiles, loadingSt
       <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-8 border border-gray-200 dark:border-gray-600">
         <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Recent Activity</h3>
         <div className="space-y-4">
-          {[
-            { action: 'New project added', item: 'Marina Heights Tower', time: '2 hours ago', icon: '🏢', color: 'blue' },
-            { action: 'Article published', item: 'Dubai Real Estate Market Trends', time: '5 hours ago', icon: '📝', color: 'purple' },
-            { action: 'Developer updated', item: 'Emaar Properties', time: '1 day ago', icon: '👥', color: 'green' },
-            { action: 'Media uploaded', item: '15 new images', time: '2 days ago', icon: '📁', color: 'orange' },
-          ].map((activity, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="flex items-center gap-4 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 hover:shadow-md transition-shadow"
-            >
-              <div className={`w-10 h-10 bg-${activity.color}-500 rounded-lg flex items-center justify-center`}>
-                <span className="text-white text-lg">{activity.icon}</span>
-              </div>
-              <div className="flex-1">
-                <p className="text-gray-900 dark:text-white font-medium">{activity.action}</p>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">{activity.item}</p>
-              </div>
-              <span className="text-gray-500 dark:text-gray-400 text-sm">{activity.time}</span>
-            </motion.div>
-          ))}
+          {activities.length > 0 ? (
+            activities.slice(0, 5).map((activity, index) => {
+              const getActivityIcon = (category: string) => {
+                switch (category.toLowerCase()) {
+                  case 'project': return '🏢';
+                  case 'article': return '📝';
+                  case 'developer': return '👥';
+                  case 'media': return '📁';
+                  case 'user': return '👤';
+                  case 'system': return '⚙️';
+                  default: return '📋';
+                }
+              };
+              
+              const getActivityColor = (level: string) => {
+                switch (level.toLowerCase()) {
+                  case 'error': return 'red';
+                  case 'warning': return 'yellow';
+                  case 'success': return 'green';
+                  case 'info': return 'blue';
+                  default: return 'gray';
+                }
+              };
+              
+              const formatTime = (timestamp: string) => {
+                const date = new Date(timestamp);
+                const now = new Date();
+                const diffMs = now.getTime() - date.getTime();
+                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                const diffDays = Math.floor(diffHours / 24);
+                
+                if (diffDays > 0) {
+                  return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+                } else if (diffHours > 0) {
+                  return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+                } else {
+                  const diffMins = Math.floor(diffMs / (1000 * 60));
+                  return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+                }
+              };
+              
+              return (
+                <motion.div
+                  key={activity.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="flex items-center gap-4 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 hover:shadow-md transition-shadow"
+                >
+                  <div className={`w-10 h-10 bg-${getActivityColor(activity.level)}-500 rounded-lg flex items-center justify-center`}>
+                    <span className="text-white text-lg">{getActivityIcon(activity.category)}</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-gray-900 dark:text-white font-medium">{activity.message}</p>
+                    {activity.details && (
+                      <p className="text-gray-600 dark:text-gray-400 text-sm">
+                        {typeof activity.details === 'string' ? activity.details : JSON.stringify(activity.details)}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-gray-500 dark:text-gray-400 text-sm">{formatTime(activity.timestamp)}</span>
+                </motion.div>
+              );
+            })
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-500 dark:text-gray-400">No recent activity</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

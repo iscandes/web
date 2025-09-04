@@ -30,7 +30,6 @@ interface Project {
   developer: string;
   status: string;
   description: string;
-  roi: string;
   bedrooms?: number;
   bathrooms?: number;
   area?: string;
@@ -250,10 +249,7 @@ export default function DeveloperDetailPage() {
                       </div>
                     )}
                     
-                    {/* ROI Badge */}
-                    <div className="absolute top-4 right-4 bg-green-ocean text-white px-3 py-1 rounded-full text-sm font-semibold">
-                      {project.roi} ROI
-                    </div>
+
                   </div>
 
                   {/* Project Details */}

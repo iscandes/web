@@ -39,7 +39,6 @@ export async function GET(
         developer: project.developer,
         status: project.status || 'Ready',
         description: project.description || `Luxury property in ${project.location}`,
-        roi: project.roi || '8%',
         bedrooms: project.bedrooms,
         bathrooms: project.bathrooms,
         area: project.area,

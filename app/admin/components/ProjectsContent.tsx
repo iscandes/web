@@ -25,6 +25,9 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
   const [availableImages, setAvailableImages] = useState<string[]>([]);
   const [pptxPreview, setPptxPreview] = useState<string | null>(null);
   const [pendingVideoFile, setPendingVideoFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState<string>('');
   
   // Delete confirmation dialog state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -54,7 +57,10 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
     units_3bedroom: 0,
     units_4bedroom: 0,
     units_5bedroom: 0,
+    units_6bedroom: 0,
+    units_7bedroom: 0,
     units_office: 0,
+    shop_commercial: 0,
     area: '',
     features: [],
     property_types: [],
@@ -62,7 +68,9 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
     presentation_file: '',
     project_type: 'ready',
     status: 'Available',
-    is_featured: false
+    is_featured: false,
+    units_8plus_bedrooms: '',
+    custom_bedroom_count: ''
   });
 
   // Fetch available images for image picker
@@ -276,11 +284,11 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
           throw new Error(result.error || 'Upload failed');
         }
       } else {
-        // For new projects, create a temporary URL and store file for later upload
-        const videoUrl = URL.createObjectURL(file);
-        setFormData(prev => ({ ...prev, featured_video: videoUrl }));
-        // Store the file for upload after project creation
+        // For new projects, don't store blob URL in form data
+        // Just store the file for upload after project creation
         setPendingVideoFile(file);
+        // Clear any existing featured_video to avoid blob URLs
+        setFormData(prev => ({ ...prev, featured_video: '' }));
         alert('Video selected! It will be uploaded when you save the project.');
       }
     } catch (error) {
@@ -293,21 +301,73 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate developer assignment
-    if (!formData.developer) {
-      alert('Please assign a developer to this project');
+    // Prevent double submission
+    if (isSubmitting) {
       return;
     }
     
+    // Enhanced form validation
+    const validationErrors = [];
+    
+    if (!formData.name?.trim()) {
+      validationErrors.push('Project name is required');
+    }
+    
+    if (!formData.developer?.trim()) {
+      validationErrors.push('Developer assignment is required');
+    }
+    
+    if (!formData.location?.trim()) {
+      validationErrors.push('Location is required');
+    }
+    
+    if (!formData.starting_price?.trim()) {
+      validationErrors.push('Starting price is required');
+    }
+    
+    if (!formData.description?.trim()) {
+      validationErrors.push('Description is required');
+    }
+    
+    // Validate video file if present
+    if (pendingVideoFile) {
+      const maxSize = 250 * 1024 * 1024; // 250MB
+      const allowedTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
+      
+      if (pendingVideoFile.size > maxSize) {
+        validationErrors.push('Video file must be smaller than 250MB');
+      }
+      
+      if (!allowedTypes.includes(pendingVideoFile.type)) {
+        validationErrors.push('Video must be MP4, WebM, or MOV format');
+      }
+    }
+    
+    if (validationErrors.length > 0) {
+      alert('Please fix the following errors:\n\n' + validationErrors.join('\n'));
+      return;
+    }
+    
+    setIsSubmitting(true);
+    setUploadProgress(0);
+    setUploadStatus('Preparing project...');
+    
     try {
+      console.log('🚀 Starting project submission with data:', formData);
+      console.log('📋 Available developers:', developers.map(d => ({ id: d.id, name: d.name })));
+      
       // Find the developer ID from the developer name
       const selectedDeveloper = developers.find(dev => dev.name === formData.developer);
       let developerId = selectedDeveloper?.id;
       let developerAutoCreated = false;
       
+      console.log('👤 Selected developer:', selectedDeveloper, 'ID:', developerId);
+      
       // If developer doesn't exist, create it first
       if (!developerId && formData.developer) {
         try {
+          setUploadStatus('Creating developer profile...');
+          setUploadProgress(10);
           const slug = formData.developer.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
           const createDeveloperResponse = await fetch('/api/admin/developers', {
             method: 'POST',
@@ -348,6 +408,9 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
         }
       }
       
+      setUploadStatus(editingProject ? 'Updating project...' : 'Creating project...');
+      setUploadProgress(30);
+      
       const url = editingProject 
         ? `/api/admin/projects/${editingProject.id}` 
         : '/api/admin/projects';
@@ -360,19 +423,33 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
         developer_id: developerId
       };
       
+      console.log('📤 Making API request to:', url, 'with method:', method);
+      console.log('📦 Project data being sent:', projectData);
+      
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(projectData),
+        signal: controller.signal
        });
+       
+       clearTimeout(timeoutId);
+       console.log('📥 API response status:', response.status, response.statusText);
 
       if (response.ok) {
         const result = await response.json();
         
         // If this is a new project and we have a pending video file, upload it now
         if (!editingProject && pendingVideoFile) {
+          setUploadStatus('Uploading video file...');
+          setUploadProgress(50);
+          
           // Get the project ID from the response - the API returns project data in 'data' field
           const projectId = result.data?.id;
           
@@ -383,6 +460,9 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
             try {
               console.log('Uploading video for project ID:', projectId);
               console.log('Pending video file:', pendingVideoFile);
+              
+              const fileSizeMB = (pendingVideoFile.size / (1024 * 1024)).toFixed(2);
+              setUploadStatus(`Uploading video (${fileSizeMB}MB)...`);
               
               const videoFormData = new FormData();
               videoFormData.append('file', pendingVideoFile);
@@ -399,6 +479,9 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
               console.log('Video upload response:', videoResult);
               
               if (videoResponse.ok && videoResult.success) {
+                setUploadProgress(80);
+                setUploadStatus('Finalizing project...');
+                
                 // Update the project with the actual video URL
                 console.log('Updating project with video URL:', videoResult.data.filePath);
                 const updateResponse = await fetch(`/api/admin/projects/${projectId}`, {
@@ -413,6 +496,9 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
                 });
                 
                 if (updateResponse.ok) {
+                  setUploadProgress(100);
+                  setUploadStatus('Upload completed successfully!');
+                  
                   console.log('Video uploaded and project updated successfully:', videoResult.data.filePath);
                   const successMsg = developerAutoCreated 
                     ? `✅ Project and video uploaded successfully! Developer "${formData.developer}" was automatically created.`
@@ -455,6 +541,9 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
           }
         } else {
           // Success without video upload
+          setUploadProgress(100);
+          setUploadStatus('Project created successfully!');
+          
           const successMsg = developerAutoCreated 
             ? `✅ Project created successfully! Developer "${formData.developer}" was automatically created.`
             : '✅ Project created successfully!';
@@ -465,6 +554,14 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
         setIsModalOpen(false);
         setEditingProject(null);
         setPendingVideoFile(null); // Clear pending video file
+        
+        // Reset loading states
+        setTimeout(() => {
+          setIsSubmitting(false);
+          setUploadProgress(0);
+          setUploadStatus('');
+        }, 1500); // Show success message for 1.5 seconds
+        
         setFormData({
           name: '',
           description: '',
@@ -505,14 +602,33 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
         if (pendingVideoFile) {
           setPendingVideoFile(null);
         }
+        
+        // Reset loading states on error
+        setIsSubmitting(false);
+        setUploadProgress(0);
+        setUploadStatus('');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving project:', error);
-      alert('Error saving project');
+      
+      let errorMessage = 'Error saving project';
+      if (error.name === 'AbortError') {
+        errorMessage = 'Request timed out. Please check your connection and try again.';
+      } else if (error.message) {
+        errorMessage = `Error: ${error.message}`;
+      }
+      
+      alert(errorMessage);
+      
       // Clean up pending video file on error
       if (pendingVideoFile) {
         setPendingVideoFile(null);
       }
+      
+      // Reset loading states on error
+      setIsSubmitting(false);
+      setUploadProgress(0);
+      setUploadStatus('');
     }
   };
 
@@ -604,7 +720,10 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
               units_3bedroom: 0,
               units_4bedroom: 0,
               units_5bedroom: 0,
-              units_office: 0,
+              units_6bedroom: 0,
+               units_7bedroom: 0,
+               units_office: 0,
+               shop_commercial: 0,
               area: '',
               features: [],
               property_types: [],
@@ -612,7 +731,9 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
               presentation_file: '',
               project_type: 'ready',
               status: 'Available',
-              is_featured: false
+              is_featured: false,
+              units_8plus_bedrooms: '',
+              custom_bedroom_count: ''
             });
             setPendingVideoFile(null); // Clear any pending video file
             setSelectedUnitTypes([]);
@@ -754,7 +875,9 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
                             className="px-4 py-2 hover:bg-white/10 cursor-pointer text-white border-b border-white/5 last:border-b-0"
                           >
                             <div className="font-medium">{developer.name}</div>
-                            <div className="text-xs text-gray-400">{developer.projects_count} projects</div>
+                            {developer.projects_count > 0 && (
+                              <div className="text-xs text-gray-400">{developer.projects_count} projects</div>
+                            )}
                           </div>
                         ))}
                         
@@ -822,8 +945,9 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
                       <option value="Villa">Villa</option>
                       <option value="Townhouse">Townhouse</option>
                       <option value="Office">Office</option>
-                      <option value="Commercial">Commercial</option>
                       <option value="Community">Community</option>
+                      <option value="Commercial">Commercial</option>
+                      <option value="Stand-alone">Stand-alone</option>
                     </select>
                   </div>
 
@@ -831,7 +955,7 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
                   <div>
                     <label className="block text-sm font-medium text-white mb-3">Property Type</label>
                     <div className="grid grid-cols-2 gap-3">
-                      {['Apartment', 'Villa', 'Town House', 'Office', 'Shop/Commercial'].map((type) => (
+                      {['Apartment', 'Villa', 'Town House', 'Office'].map((type) => (
                         <label key={type} className="flex items-center space-x-2 cursor-pointer">
                           <input
                             type="checkbox"
@@ -903,7 +1027,7 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
               {/* Unit Types Toggle Buttons */}
               <div>
                 <label className="block text-sm font-medium text-white mb-3">Available Unit Types</label>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-3">
                   {[
                     { key: 'studios', label: 'Studio' },
                     { key: 'units_1bedroom', label: '1 Bedroom' },
@@ -911,7 +1035,10 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
                     { key: 'units_3bedroom', label: '3 Bedroom' },
                     { key: 'units_4bedroom', label: '4 Bedroom' },
                     { key: 'units_5bedroom', label: '5 Bedroom' },
+                    { key: 'units_6bedroom', label: '6 Bedroom' },
+                    { key: 'units_7bedroom', label: '7 Bedroom' },
                     { key: 'office', label: 'Office' },
+                    { key: 'shop_commercial', label: 'Shop' },
                     { key: 'bathrooms', label: 'Bathrooms' }
                   ].map((unit) => {
                     const isSelected = selectedUnitTypes.includes(unit.label);
@@ -941,6 +1068,41 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
                       </button>
                     );
                   })}
+                </div>
+                
+                {/* 8+ Bedrooms Custom Input */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-white mb-2">8+ Bedrooms (Custom)</label>
+                  <div className="flex gap-3 items-center">
+                    <select
+                      value={formData.units_8plus_bedrooms || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, units_8plus_bedrooms: e.target.value }))}
+                      className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-brand-green"
+                    >
+                      <option value="">Select bedrooms</option>
+                      <option value="8">8 Bedrooms</option>
+                      <option value="9">9 Bedrooms</option>
+                      <option value="10">10 Bedrooms</option>
+                      <option value="11">11 Bedrooms</option>
+                      <option value="12">12 Bedrooms</option>
+                      <option value="custom">Custom (specify below)</option>
+                    </select>
+                    {formData.units_8plus_bedrooms === 'custom' && (
+                      <input
+                        type="number"
+                        min="8"
+                        placeholder="Enter number of bedrooms"
+                        value={formData.custom_bedroom_count || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, custom_bedroom_count: e.target.value }))}
+                        className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-brand-gray focus:outline-none focus:border-brand-green"
+                      />
+                    )}
+                  </div>
+                  {(formData.units_8plus_bedrooms && formData.units_8plus_bedrooms !== '') && (
+                    <div className="mt-2 text-xs text-brand-green">
+                      ✓ {formData.units_8plus_bedrooms === 'custom' ? `${formData.custom_bedroom_count || 'Custom'}` : formData.units_8plus_bedrooms} bedroom units available
+                    </div>
+                  )}
                 </div>
                 
                 {/* Selected Unit Types Display */}
@@ -1202,6 +1364,27 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
                 </div>
               </div>
 
+              {/* Upload Progress Indicator */}
+              {isSubmitting && (
+                <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-white text-sm font-medium">{uploadStatus}</span>
+                    <span className="text-brand-green text-sm font-medium">{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-white/10 rounded-full h-2">
+                    <div 
+                      className="bg-gradient-to-r from-brand-green to-green-400 h-2 rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${uploadProgress}%` }}
+                    ></div>
+                  </div>
+                  {pendingVideoFile && (
+                    <div className="mt-2 text-xs text-gray-400">
+                      Uploading: {pendingVideoFile.name} ({(pendingVideoFile.size / (1024 * 1024)).toFixed(2)}MB)
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex space-x-4 pt-4">
                 <button
                   type="button"
@@ -1215,9 +1398,21 @@ export default function ProjectsContent({ projects, onUpdate }: ProjectsContentP
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-brand-green hover:bg-brand-green/80 text-white rounded-lg transition-colors"
+                  disabled={isSubmitting}
+                  className={`flex-1 px-6 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                    isSubmitting 
+                      ? 'bg-gray-500 cursor-not-allowed' 
+                      : 'bg-brand-green hover:bg-brand-green/80'
+                  } text-white`}
                 >
-                  {editingProject ? 'Update' : 'Create'} Project
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <span>{editingProject ? 'Update' : 'Create'} Project</span>
+                  )}
                 </button>
               </div>
             </form>

@@ -10,17 +10,28 @@ export async function GET(
   { params }: { params: { path: string[] } }
 ) {
   try {
-    const filePath = path.join(process.cwd(), 'public', 'media', ...params.path);
-    console.log('Serving media file:', filePath);
+    // First try the media directory
+    let filePath = path.join(process.cwd(), 'public', 'media', ...params.path);
+    console.log('Trying media file:', filePath);
     
-    // Check if file exists
+    // Check if file exists in media directory
     let stats;
     try {
       stats = await statAsync(filePath);
     } catch (error) {
-      console.error('Media file not found:', filePath, error);
-      return new NextResponse('File not found', { status: 404 });
+      // If not found in media, try uploads directory
+      filePath = path.join(process.cwd(), 'public', 'uploads', ...params.path);
+      console.log('Trying uploads file:', filePath);
+      
+      try {
+        stats = await statAsync(filePath);
+      } catch (uploadsError) {
+        console.error('Media file not found in either location:', filePath, uploadsError);
+        return new NextResponse('File not found', { status: 404 });
+      }
     }
+    
+    console.log('Serving media file:', filePath);
 
     const fileSize = stats.size;
     console.log('Media file size:', fileSize);

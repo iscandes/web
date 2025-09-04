@@ -10,11 +10,11 @@ interface Project {
   slug: string;
   location: string;
   price: string;
+  starting_price?: string;
   image: string;
   developer: string;
   status: string;
   description: string;
-  roi: string;
 }
 
 export default function FeaturedProjects() {

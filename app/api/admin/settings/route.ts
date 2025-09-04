@@ -73,6 +73,12 @@ export async function PUT(request: NextRequest) {
     if (updateData.theme) {
       newSettings.theme = { ...currentSettings.theme, ...updateData.theme };
     }
+    if (updateData.whatsapp) {
+      newSettings.whatsapp = { ...currentSettings.whatsapp, ...updateData.whatsapp };
+    }
+    if (updateData.features) {
+      newSettings.features = { ...currentSettings.features, ...updateData.features };
+    }
     
     const updatedSettings = await MySQLDatabase.updateSettings(newSettings);
     

@@ -362,10 +362,12 @@ export default function DevelopersContent({ developers, onUpdate }: DevelopersCo
                 </div>
               )}
               
-              <div className="flex items-center space-x-2 text-brand-gray">
-                <i className="ri-building-2-line"></i>
-                <span className="text-sm">{developer.projects_count} Projects</span>
-              </div>
+              {developer.projects_count > 0 && (
+                <div className="flex items-center space-x-2 text-brand-gray">
+                  <i className="ri-building-2-line"></i>
+                  <span className="text-sm">{developer.projects_count} Projects</span>
+                </div>
+              )}
 
               {developer.website && (
                 <div className="flex items-center space-x-2 text-brand-gray">
@@ -675,19 +677,21 @@ export default function DevelopersContent({ developers, onUpdate }: DevelopersCo
                     )}
                   </div>
 
-                  <div>
-                    <label className="block text-white font-medium mb-2">
-                      Projects Count
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.projects_count || 0}
-                      onChange={(e) => setFormData({ ...formData, projects_count: parseInt(e.target.value) || 0 })}
-                      className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-brand-gray focus:outline-none focus:border-brand-green"
-                      placeholder="0"
-                      min="0"
-                    />
-                  </div>
+                  {(formData.projects_count > 0 || editingDeveloper) && (
+                    <div>
+                      <label className="block text-white font-medium mb-2">
+                        Projects Count
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.projects_count || ''}
+                        onChange={(e) => setFormData({ ...formData, projects_count: parseInt(e.target.value) || 0 })}
+                        className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-brand-gray focus:outline-none focus:border-brand-green"
+                        placeholder="Enter project count (optional)"
+                        min="0"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Status */}

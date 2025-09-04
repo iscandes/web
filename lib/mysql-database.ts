@@ -10,16 +10,18 @@ const dbConfig = {
   ssl: {
     rejectUnauthorized: false
   },
-  // Minimal connection limits to avoid exceeding server limits
-  connectionLimit: 1,
-  queueLimit: 5,
+  // Increased connection limits to prevent timeouts
+  connectionLimit: 10,
+  queueLimit: 20,
+  acquireTimeout: 60000, // 60 seconds
+  timeout: 60000, // 60 seconds
   // Connection pool options supported by mysql2
-  enableKeepAlive: false,
-  idleTimeout: 30000,
-  maxIdle: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0,
+  idleTimeout: 300000, // 5 minutes
+  maxIdle: 5,
   // Additional connection management
   multipleStatements: false
-  // Removed invalid options: acquireTimeout, timeout, reconnect, releaseTimeout
 };
 
 // Create connection pool
@@ -54,7 +56,12 @@ export interface Project {
   units_3bedroom?: number;
   units_4bedroom?: number;
   units_5bedroom?: number;
+  units_6bedroom?: number;
+  units_7bedroom?: number;
+  units_8plus_bedrooms?: string;
+  custom_bedroom_count?: string;
   units_office?: number;
+  shop_commercial?: number;
   living_rooms?: number;
   units?: string[];
   area: string;
@@ -182,6 +189,15 @@ export interface SystemLog {
   ip_address?: string;
   user_agent?: string;
   details?: string;
+}
+
+export interface SystemActivity {
+  id: number;
+  timestamp: Date;
+  level: 'info' | 'warning' | 'error' | 'success';
+  category: string;
+  message: string;
+  details?: any;
 }
 
 export interface ChatMessage {
@@ -821,7 +837,9 @@ export class MySQLDatabase {
         throw new Error('Project description is required');
       }
 
+      console.log('🔗 Getting database connection for project creation...');
       connection = await pool.getConnection();
+      console.log('✅ Database connection acquired for project creation');
       
       // Helper function to convert undefined to null
       const toNullIfUndefined = (value: any) => value === undefined ? null : value;
@@ -884,6 +902,18 @@ export class MySQLDatabase {
       }
       
       connection.release();
+      
+      // Log the activity
+      try {
+        await this.createActivity({
+          level: 'success',
+          category: 'project',
+          message: `Created new project "${project.name}" by ${project.developer || 'Unknown Developer'}`,
+          details: null
+        });
+      } catch (logError) {
+        console.error('Failed to log project creation activity:', logError);
+      }
       
       return await this.getProjectById(insertId);
     } catch (error: any) {
@@ -996,6 +1026,22 @@ export class MySQLDatabase {
       }
       
       connection.release();
+      
+      // Log the activity
+      try {
+        const updatedProject = await this.getProjectById(id);
+        const updatedFields = Object.keys(updateData);
+        const fieldText = updatedFields.length === 1 ? updatedFields[0] : `${updatedFields.length} fields`;
+        await this.createActivity({
+          level: 'info',
+          category: 'project',
+          message: `Updated ${fieldText} for project "${updatedProject?.name || 'Unknown'}"`,
+          details: null
+        });
+      } catch (logError) {
+        console.error('Failed to log project update activity:', logError);
+      }
+      
       return await this.getProjectById(id);
     } catch (error) {
       console.error('Error updating project:', error);
@@ -1018,6 +1064,10 @@ export class MySQLDatabase {
       const projectData = (checkRows as any[])[0];
       const developerName = projectData.developer;
       
+      // Get project name for logging before deletion
+      const [projectRows] = await connection.execute('SELECT name FROM projects WHERE id = ?', [id]);
+      const projectName = (projectRows as any[])[0]?.name || 'Unknown';
+      
       // Delete the project (CASCADE will handle related records)
       const [result] = await connection.execute('DELETE FROM projects WHERE id = ?', [id]);
       
@@ -1031,6 +1081,20 @@ export class MySQLDatabase {
       // Check if any rows were affected
       const affectedRows = (result as any).affectedRows;
       console.log(`Delete operation affected ${affectedRows} rows for project id ${id}`);
+      
+      // Log the activity if deletion was successful
+      if (affectedRows > 0) {
+        try {
+          await this.createActivity({
+            level: 'warning',
+            category: 'project',
+            message: `Deleted project "${projectName}" by ${developerName || 'Unknown Developer'}`,
+            details: null
+          });
+        } catch (logError) {
+          console.error('Failed to log project deletion activity:', logError);
+        }
+      }
       
       return affectedRows > 0;
     } catch (error) {
@@ -1068,6 +1132,18 @@ export class MySQLDatabase {
       const insertId = (result as any).insertId;
       connection.release();
       
+      // Log the activity
+      try {
+        await this.createActivity({
+          level: 'success',
+          category: 'developer',
+          message: `Added new developer "${developer.name}" from ${developer.location || 'Unknown Location'}`,
+          details: null
+        });
+      } catch (logError) {
+        console.error('Failed to log developer creation activity:', logError);
+      }
+      
       return await this.getDeveloperById(insertId);
     } catch (error) {
       console.error('Error creating developer:', error);
@@ -1092,6 +1168,11 @@ export class MySQLDatabase {
     try {
       const connection = await pool.getConnection();
       
+      // Get the current developer name for logging
+      const [currentRows] = await connection.execute('SELECT name FROM developers WHERE id = ?', [id]);
+      const currentDeveloper = (currentRows as any[])[0];
+      const developerName = currentDeveloper?.name || 'Unknown Developer';
+      
       const fields = Object.keys(updateData).filter(key => key !== 'id');
       const setClause = fields.map(field => `${field} = ?`).join(', ');
       const values = fields.map(field => (updateData as any)[field]);
@@ -1102,6 +1183,19 @@ export class MySQLDatabase {
       );
       
       connection.release();
+      
+      // Log the activity
+      try {
+        await this.createActivity({
+          level: 'info',
+          category: 'developer',
+          message: `Developer updated: ${developerName}`,
+          details: JSON.stringify({ developerId: id, updatedFields: fields })
+        });
+      } catch (logError) {
+        console.error('Failed to log developer update activity:', logError);
+      }
+      
       return await this.getDeveloperById(id);
     } catch (error) {
       console.error('Error updating developer:', error);
@@ -1265,6 +1359,10 @@ export class MySQLDatabase {
     try {
       const connection = await pool.getConnection();
       
+      // Get developer name for logging before deletion
+      const [developerRows] = await connection.execute('SELECT name FROM developers WHERE id = ?', [id]);
+      const developerName = (developerRows as any[])[0]?.name || 'Unknown Developer';
+      
       // Start transaction
       await connection.beginTransaction();
       
@@ -1291,6 +1389,18 @@ export class MySQLDatabase {
         // Commit transaction
         await connection.commit();
         connection.release();
+        
+        // Log the activity
+        try {
+          await this.createActivity({
+            level: 'warning',
+            category: 'developer',
+            message: `Developer deleted: ${developerName}`,
+            details: JSON.stringify({ developerId: id, deletedProjects })
+          });
+        } catch (logError) {
+          console.error('Failed to log developer deletion activity:', logError);
+        }
         
         return { success: true, deletedProjects };
       } catch (error) {
@@ -1893,7 +2003,7 @@ export class MySQLDatabase {
             email: dbSettings.contact_email || 'admin@example.com',
       phone: dbSettings.contact_phone || null,
       address: dbSettings.contact_address || 'Dubai, UAE',
-      whatsapp: dbSettings.contact_whatsapp || null
+      whatsapp: dbSettings.contact_whatsapp || dbSettings.whatsapp_phone || null
           },
           social: {
             facebook: dbSettings.social_facebook || '',
@@ -1916,6 +2026,14 @@ export class MySQLDatabase {
             enableNewsletter: dbSettings.features_enable_newsletter !== false,
             enableWhatsApp: dbSettings.features_enable_whatsapp !== false,
             enableLiveChat: dbSettings.features_enable_live_chat === true
+          },
+          whatsapp: {
+            phone: dbSettings.whatsapp_phone || dbSettings.contact_whatsapp || null,
+            enabled: dbSettings.whatsapp_enabled !== false,
+            defaultMessage: dbSettings.whatsapp_default_message || 'Hello! I\'m interested in your real estate services.',
+            businessHours: dbSettings.whatsapp_business_hours ? JSON.parse(dbSettings.whatsapp_business_hours) : null,
+            autoReply: dbSettings.whatsapp_auto_reply || null,
+            showOnPages: dbSettings.whatsapp_show_on_pages ? JSON.parse(dbSettings.whatsapp_show_on_pages) : ['home', 'projects', 'contact']
           }
         };
       } else {
@@ -1954,6 +2072,14 @@ export class MySQLDatabase {
             enableNewsletter: true,
             enableWhatsApp: true,
             enableLiveChat: false
+          },
+          whatsapp: {
+            phone: null,
+            enabled: true,
+            defaultMessage: 'Hello! I\'m interested in your real estate services.',
+            businessHours: null,
+            autoReply: null,
+            showOnPages: ['home', 'projects', 'contact']
           }
         };
       }
@@ -1994,6 +2120,14 @@ export class MySQLDatabase {
           enableNewsletter: true,
           enableWhatsApp: true,
           enableLiveChat: false
+        },
+        whatsapp: {
+          phone: null,
+          enabled: true,
+          defaultMessage: 'Hello! I\'m interested in your real estate services.',
+          businessHours: null,
+          autoReply: null,
+          showOnPages: ['home', 'projects', 'contact']
         }
       };
     }
@@ -2043,6 +2177,15 @@ export class MySQLDatabase {
         if (settingsData.features.enableNewsletter !== undefined) dbData.features_enable_newsletter = settingsData.features.enableNewsletter;
         if (settingsData.features.enableWhatsApp !== undefined) dbData.features_enable_whatsapp = settingsData.features.enableWhatsApp;
         if (settingsData.features.enableLiveChat !== undefined) dbData.features_enable_live_chat = settingsData.features.enableLiveChat;
+      }
+      
+      if (settingsData.whatsapp) {
+        if (settingsData.whatsapp.phone !== undefined) dbData.whatsapp_phone = settingsData.whatsapp.phone;
+        if (settingsData.whatsapp.enabled !== undefined) dbData.whatsapp_enabled = settingsData.whatsapp.enabled;
+        if (settingsData.whatsapp.defaultMessage !== undefined) dbData.whatsapp_default_message = settingsData.whatsapp.defaultMessage;
+        if (settingsData.whatsapp.businessHours !== undefined) dbData.whatsapp_business_hours = settingsData.whatsapp.businessHours ? JSON.stringify(settingsData.whatsapp.businessHours) : null;
+        if (settingsData.whatsapp.autoReply !== undefined) dbData.whatsapp_auto_reply = settingsData.whatsapp.autoReply;
+        if (settingsData.whatsapp.showOnPages !== undefined) dbData.whatsapp_show_on_pages = settingsData.whatsapp.showOnPages ? JSON.stringify(settingsData.whatsapp.showOnPages) : null;
       }
       
       // Check if settings exist
@@ -2397,6 +2540,81 @@ export class MySQLDatabase {
       return await this.getAISettings() as AIApiSettings;
     } catch (error) {
       console.error('Error saving AI settings:', error);
+      throw error;
+    }
+  }
+
+  // Activity Logging Methods
+  static async getRecentActivities(limit: number = 10, frontendOnly: boolean = false): Promise<SystemActivity[]> {
+    try {
+      const connection = await pool.getConnection();
+      
+      let query = `SELECT id, timestamp, level, category, message, details 
+                   FROM system_logs`;
+      let params: any[] = [];
+      
+      if (frontendOnly) {
+        // Filter for frontend-relevant activities only
+        query += ` WHERE category IN ('project', 'developer', 'article', 'media')`;
+      }
+      
+      query += ` ORDER BY timestamp DESC LIMIT ?`;
+      params.push(limit);
+      
+      const [rows] = await connection.execute(query, params);
+      connection.release();
+      
+      return (rows as any[]).map(row => ({
+        id: row.id,
+        timestamp: row.timestamp,
+        level: row.level,
+        category: row.category,
+        message: row.message,
+        details: row.details ? JSON.parse(row.details) : null
+      }));
+    } catch (error) {
+      console.error('Error fetching recent activities:', error);
+      throw error;
+    }
+  }
+
+  static async createActivity(activityData: {
+    level: 'info' | 'warning' | 'error' | 'success';
+    category: string;
+    message: string;
+    details?: string | null;
+  }): Promise<SystemActivity> {
+    try {
+      const connection = await pool.getConnection();
+      const [result] = await connection.execute(
+        `INSERT INTO system_logs (level, category, message, details, timestamp) 
+         VALUES (?, ?, ?, ?, NOW())`,
+        [activityData.level, activityData.category, activityData.message, activityData.details]
+      );
+      
+      const insertId = (result as any).insertId;
+      
+      // Fetch the created activity
+      const [rows] = await connection.execute(
+        `SELECT id, timestamp, level, category, message, details 
+         FROM system_logs 
+         WHERE id = ?`,
+        [insertId]
+      );
+      
+      connection.release();
+      
+      const row = (rows as any[])[0];
+      return {
+        id: row.id,
+        timestamp: row.timestamp,
+        level: row.level,
+        category: row.category,
+        message: row.message,
+        details: row.details ? JSON.parse(row.details) : null
+      };
+    } catch (error) {
+      console.error('Error creating activity:', error);
       throw error;
     }
   }

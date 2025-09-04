@@ -175,7 +175,7 @@ export default function CinematicProjectPage({ projectSlug }: CinematicProjectPa
           <p className="text-gray-400 mb-10 text-lg leading-relaxed">{error || 'The requested project could not be found.'}</p>
           <Link 
             href="/projects" 
-            className="inline-block px-8 py-4 border border-amber-400 text-amber-400 hover:bg-amber-400 hover:text-black transition-all duration-500 text-sm tracking-widest uppercase font-medium"
+            className="inline-block px-8 py-4 border border-green-ocean text-green-ocean hover:bg-green-ocean hover:text-white transition-all duration-500 text-sm tracking-widest uppercase font-medium"
           >
             Return to Projects
           </Link>
@@ -185,13 +185,28 @@ export default function CinematicProjectPage({ projectSlug }: CinematicProjectPa
   }
 
   const getVideoSource = () => {
-    console.log('Getting video source for project:', project.id, project.name);
+    if (!project || !project.id) {
+      console.error('❌ getVideoSource called without valid project data');
+      return null;
+    }
+    
+    console.log('🎬 Getting video source for project:', project.id, project.name);
+    console.log('🔍 Project slug from URL:', projectSlug);
+    
+    // Validate that we're getting video for the correct project
+    const isNumericSlug = /^\d+$/.test(projectSlug);
+    const expectedId = isNumericSlug ? parseInt(projectSlug) : null;
+    
+    if (expectedId && expectedId !== project.id) {
+      console.error('⚠️ PROJECT MISMATCH! Expected ID:', expectedId, 'but got project ID:', project.id);
+      console.error('This indicates a cross-project video issue!');
+    }
     
     // First priority: Check featured_video
     if (project.featured_video) {
-      console.log('Using featured_video:', project.featured_video);
+      console.log('✅ Using featured_video:', project.featured_video);
       const path = normalizePath(project.featured_video);
-      console.log('Normalized featured_video path:', path);
+      console.log('🔗 Normalized featured_video path:', path);
       return path;
     }
     
@@ -210,13 +225,12 @@ export default function CinematicProjectPage({ projectSlug }: CinematicProjectPa
         return normalizePath(videoPath);
       }
       
-      // Then look for video extensions in urls
+      // Then look for video extensions in urls (only .mp4 to avoid 404s)
       const videoByExtension = project.media_files.find(file => {
         const url = file.url?.toLowerCase() || '';
         const filePath = file.file_path?.toLowerCase() || '';
         const hasVideoExtension = 
-          url.endsWith('.mp4') || url.endsWith('.webm') || url.endsWith('.mov') ||
-          filePath.endsWith('.mp4') || filePath.endsWith('.webm') || filePath.endsWith('.mov');
+          url.endsWith('.mp4') || filePath.endsWith('.mp4');
         
         if (hasVideoExtension) {
           console.log('Found file with video extension:', file);
@@ -438,19 +452,11 @@ export default function CinematicProjectPage({ projectSlug }: CinematicProjectPa
                 console.error('Video src that failed:', video.currentSrc || video.src);
                 // Set a data attribute to indicate error for styling
                 video.setAttribute('data-error', 'true');
-                // Try to reload with a different source format if available
-                const currentSrc = video.currentSrc || video.src;
-                if (currentSrc && currentSrc.includes('.mp4')) {
-                  const webmSrc = currentSrc.replace('.mp4', '.webm');
-                  console.log('Trying alternative format:', webmSrc);
-                  video.src = webmSrc;
-                  video.load();
-                }
+                // Log the error but don't try alternative formats to avoid 404s
+                console.log('Video failed to load, but not attempting alternative formats to avoid 404 errors');
               }}
             >
               {getVideoSource() && <source src={getVideoSource()} type="video/mp4" />}
-              {getVideoSource() && <source src={getVideoSource()?.replace('.mp4', '.webm')} type="video/webm" />}
-              {getVideoSource() && <source src={getVideoSource()?.replace('.mp4', '.mov')} type="video/quicktime" />}
               Your browser does not support the video tag.
             </video>
           </div>
@@ -458,36 +464,46 @@ export default function CinematicProjectPage({ projectSlug }: CinematicProjectPa
           {/* Elegant Overlay */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60"></div>
 
-          {/* Luxury Navigation */}
-          <nav className="absolute top-0 left-0 right-0 z-50 p-8">
-            <div className="flex justify-between items-center">
-              <Link 
-                href="/projects" 
-                className="group flex items-center space-x-3 text-white/80 hover:text-white transition-all duration-300"
-              >
-                <div className="w-10 h-10 border border-white/30 rounded-full flex items-center justify-center group-hover:border-amber-400 group-hover:bg-amber-400/10 transition-all duration-300">
-                  <i className="ri-arrow-left-line text-lg"></i>
+          {/* Enhanced Navigation */}
+          <nav className="absolute top-0 left-0 right-0 z-50 bg-gradient-to-b from-black/50 to-transparent backdrop-blur-sm">
+            <div className="max-w-7xl mx-auto px-6 py-6">
+              <div className="flex justify-between items-center">
+                <Link 
+                  href="/projects" 
+                  className="group flex items-center space-x-4 text-white/90 hover:text-white transition-all duration-300 bg-black/20 hover:bg-black/40 px-6 py-3 rounded-full backdrop-blur-md border border-white/10 hover:border-amber-400/50"
+                >
+                  <div className="w-8 h-8 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <i className="ri-arrow-left-line text-xl"></i>
+                  </div>
+                  <span className="text-sm tracking-wide font-medium">Back to Projects</span>
+                </Link>
+                
+                <div className="flex items-center space-x-6">
+                  <div className="text-right">
+                    <div className="text-xs tracking-widest uppercase text-white/60 mb-1">Premium Choice</div>
+                    <div className="text-sm tracking-wider text-white/90 font-medium">Real Estate</div>
+                  </div>
+                  <Link 
+                    href="/contact" 
+                    className="bg-green-ocean hover:bg-green-ocean-light text-white px-6 py-2 rounded-full text-sm font-medium tracking-wide transition-all duration-300 hover:scale-105"
+                  >
+                    Contact Us
+                  </Link>
                 </div>
-                <span className="text-sm tracking-widest uppercase font-light">Back to Projects</span>
-              </Link>
-              
-              <div className="text-right">
-                <div className="text-xs tracking-widest uppercase text-white/60 mb-1">Premium Choice</div>
-                <div className="text-sm tracking-wider text-white/80">Real Estate</div>
               </div>
             </div>
           </nav>
 
           {/* Central Content */}
-          <div className="absolute inset-0 flex items-center justify-center z-40">
-            <div className="text-center max-w-4xl mx-auto px-8">
+          <div className="absolute inset-0 flex items-center justify-center z-40 pt-20">
+            <div className="text-center max-w-5xl mx-auto px-8">
               {/* Project Title */}
-              <h1 className="text-6xl md:text-8xl font-extralight mb-8 tracking-wide leading-none">
+              <h1 className="text-5xl md:text-7xl lg:text-8xl font-extralight mb-6 tracking-wide leading-none text-white drop-shadow-2xl">
                 {project.name}
               </h1>
               
               {/* Subtitle */}
-              <p className="text-xl md:text-2xl font-light text-white/90 mb-12 tracking-wide max-w-2xl mx-auto leading-relaxed">
+              <p className="text-lg md:text-xl lg:text-2xl font-light text-white/95 mb-8 tracking-wide max-w-3xl mx-auto leading-relaxed drop-shadow-lg">
                 {project.display_title || project.description}
               </p>
 
@@ -501,13 +517,13 @@ export default function CinematicProjectPage({ projectSlug }: CinematicProjectPa
                 }}
                 className="group relative w-24 h-24 mx-auto mb-16 transition-all duration-500 hover:scale-110"
               >
-                <div className="absolute inset-0 border border-amber-400 rounded-full group-hover:border-2 transition-all duration-300"></div>
-                <div className="absolute inset-2 bg-amber-400/10 rounded-full group-hover:bg-amber-400/20 transition-all duration-300"></div>
+                <div className="absolute inset-0 border border-green-ocean rounded-full group-hover:border-2 transition-all duration-300"></div>
+                <div className="absolute inset-2 bg-green-ocean/10 rounded-full group-hover:bg-green-ocean/20 transition-all duration-300"></div>
                 <div className="absolute inset-0 flex items-center justify-center">
                   {isVideoPlaying ? (
-                    <i className="ri-pause-line text-2xl text-amber-400"></i>
+                    <i className="ri-pause-line text-2xl text-green-ocean"></i>
                   ) : (
-                    <i className="ri-play-fill text-2xl text-amber-400 ml-1"></i>
+                    <i className="ri-play-fill text-2xl text-green-ocean ml-1"></i>
                   )}
                 </div>
               </button>
@@ -527,25 +543,25 @@ export default function CinematicProjectPage({ projectSlug }: CinematicProjectPa
             </div>
           </div>
 
-          {/* Bottom Info Panel */}
-          <div className="absolute bottom-0 left-0 right-0 z-40 p-8">
-            <div className="max-w-7xl mx-auto">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-                <div className="text-center">
-                  <div className="text-3xl font-light text-amber-400 mb-2">{project.bedrooms}</div>
-                  <div className="text-xs tracking-widest uppercase text-white/60">Bedrooms</div>
+          {/* Enhanced Bottom Info Panel */}
+          <div className="absolute bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-black/80 via-black/40 to-transparent backdrop-blur-sm">
+            <div className="max-w-7xl mx-auto px-8 py-8">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
+                <div className="text-center bg-black/30 backdrop-blur-md rounded-lg p-4 border border-white/10 hover:border-amber-400/30 transition-all duration-300">
+                  <div className="text-2xl md:text-3xl font-light text-amber-400 mb-2">{project.bedrooms}</div>
+                  <div className="text-xs tracking-widest uppercase text-white/70 font-medium">Bedrooms</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-3xl font-light text-amber-400 mb-2">{project.bathrooms}</div>
-                  <div className="text-xs tracking-widest uppercase text-white/60">Bathrooms</div>
+                <div className="text-center bg-black/30 backdrop-blur-md rounded-lg p-4 border border-white/10 hover:border-amber-400/30 transition-all duration-300">
+                  <div className="text-2xl md:text-3xl font-light text-amber-400 mb-2">{project.bathrooms}</div>
+                  <div className="text-xs tracking-widest uppercase text-white/70 font-medium">Bathrooms</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-3xl font-light text-amber-400 mb-2">{project.area}</div>
-                  <div className="text-xs tracking-widest uppercase text-white/60">Area</div>
+                <div className="text-center bg-black/30 backdrop-blur-md rounded-lg p-4 border border-white/10 hover:border-amber-400/30 transition-all duration-300">
+                  <div className="text-2xl md:text-3xl font-light text-amber-400 mb-2">{project.area}</div>
+                  <div className="text-xs tracking-widest uppercase text-white/70 font-medium">Area</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-3xl font-light text-amber-400 mb-2">{project.starting_price}</div>
-                  <div className="text-xs tracking-widest uppercase text-white/60">Starting Price</div>
+                <div className="text-center bg-black/30 backdrop-blur-md rounded-lg p-4 border border-white/10 hover:border-amber-400/30 transition-all duration-300">
+                  <div className="text-2xl md:text-3xl font-light text-amber-400 mb-2">{project.starting_price}</div>
+                  <div className="text-xs tracking-widest uppercase text-white/70 font-medium">Starting Price</div>
                 </div>
               </div>
             </div>
@@ -597,11 +613,11 @@ export default function CinematicProjectPage({ projectSlug }: CinematicProjectPa
                 {/* Features */}
                 {project.features && Array.isArray(project.features) && project.features.length > 0 && (
                   <div className="space-y-4">
-                    <h3 className="text-xl font-light tracking-wide text-amber-400 mb-6">Premium Features</h3>
+                    <h3 className="text-xl font-light tracking-wide text-green-ocean mb-6">Premium Features</h3>
                     <div className="grid grid-cols-1 gap-4">
                       {project.features.slice(0, 6).map((feature, index) => (
                         <div key={index} className="flex items-center space-x-4 text-gray-300">
-                          <div className="w-2 h-2 bg-amber-400 rounded-full"></div>
+                          <div className="w-2 h-2 bg-green-ocean rounded-full"></div>
                           <span className="font-light tracking-wide">{feature}</span>
                         </div>
                       ))}
@@ -620,7 +636,7 @@ export default function CinematicProjectPage({ projectSlug }: CinematicProjectPa
                 <div className="space-y-4">
                   <Link 
                     href="/contact" 
-                    className="block w-full py-4 bg-amber-400 text-black text-center font-medium tracking-widest uppercase hover:bg-amber-300 transition-all duration-300"
+                    className="block w-full py-4 bg-green-ocean text-white text-center font-medium tracking-widest uppercase hover:bg-green-ocean-light transition-all duration-300"
                   >
                     Schedule Viewing
                   </Link>
@@ -630,7 +646,7 @@ export default function CinematicProjectPage({ projectSlug }: CinematicProjectPa
                       href={project.presentation_file}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block w-full py-4 border border-amber-400 text-amber-400 text-center font-medium tracking-widest uppercase hover:bg-amber-400 hover:text-black transition-all duration-300"
+                      className="block w-full py-4 border border-green-ocean text-green-ocean text-center font-medium tracking-widest uppercase hover:bg-green-ocean hover:text-white transition-all duration-300"
                     >
                       Download Brochure
                     </a>
@@ -642,7 +658,7 @@ export default function CinematicProjectPage({ projectSlug }: CinematicProjectPa
         </section>
 
         {/* Exclusive Viewing Section */}
-        <section className="bg-gradient-to-r from-amber-400/20 to-amber-500/20 py-16">
+        <section className="bg-gradient-to-r from-green-ocean/20 to-green-ocean-light/20 py-16">
           <div className="max-w-7xl mx-auto px-8 text-center">
             <h2 className="text-3xl font-light text-white mb-4 tracking-wide">
               Exclusive Viewing Experience
@@ -652,7 +668,7 @@ export default function CinematicProjectPage({ projectSlug }: CinematicProjectPa
             </p>
             <Link
               href="/contact"
-              className="inline-block bg-amber-400 text-black px-8 py-4 font-medium text-lg hover:bg-amber-300 shadow-lg transform hover:scale-105 transition-all duration-300 tracking-widest uppercase"
+              className="inline-block bg-green-ocean text-white px-8 py-4 font-medium text-lg hover:bg-green-ocean-light shadow-lg transform hover:scale-105 transition-all duration-300 tracking-widest uppercase"
             >
               Schedule Viewing
             </Link>

@@ -71,12 +71,11 @@ export async function GET(request: NextRequest) {
         name: project.name,
         slug: project.slug,
         location: project.location,
-        price: project.price,
+        price: project.starting_price || project.price || 'Price on Request',
         image: imageUrl,
         developer: project.developer || 'Premium Developers',
         status: project.status || 'Ready',
-        description: project.description || `Luxury property in ${project.location}`,
-        roi: project.roi || '8%'
+        description: project.description || `Luxury property in ${project.location}`
       };
     });
     

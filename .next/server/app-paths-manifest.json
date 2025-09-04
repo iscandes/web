@@ -1,7 +1,17 @@
 {
   "/page": "app/page.js",
-  "/expert/page": "app/expert/page.js",
-  "/api/expert/route": "app/api/expert/route.js",
+  "/projects/page": "app/projects/page.js",
+  "/projects/[slug]/page": "app/projects/[slug]/page.js",
   "/api/admin/settings/route": "app/api/admin/settings/route.js",
-  "/_not-found/page": "app/_not-found/page.js"
+  "/contact/page": "app/contact/page.js",
+  "/api/admin/projects/[id]/route": "app/api/admin/projects/[id]/route.js",
+  "/api/admin/projects/route": "app/api/admin/projects/route.js",
+  "/api/admin/developers/route": "app/api/admin/developers/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/admin/articles/route": "app/api/admin/articles/route.js",
+  "/api/admin/media/route": "app/api/admin/media/route.js",
+  "/api/admin/activities/route": "app/api/admin/activities/route.js",
+  "/api/admin/uploads/route": "app/api/admin/uploads/route.js",
+  "/api/developers/route": "app/api/developers/route.js",
+  "/admin/page": "app/admin/page.js"
 }

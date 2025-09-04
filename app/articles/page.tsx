@@ -2,8 +2,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -88,42 +86,33 @@ export default function ArticlesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-luxury-black text-white">
-        <Header />
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-ocean mx-auto mb-4"></div>
-            <p className="text-gray-300">Loading articles...</p>
-          </div>
+      <div className="flex items-center justify-center min-h-screen bg-luxury-black text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-ocean mx-auto mb-4"></div>
+          <p className="text-gray-300">Loading articles...</p>
         </div>
-        <Footer />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-luxury-black text-white">
-        <Header />
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <p className="text-red-400 mb-4">Error loading articles: {error}</p>
-            <button 
-              onClick={() => window.location.reload()} 
-              className="bg-green-ocean hover:bg-green-ocean-light text-white px-6 py-2 rounded-lg transition-colors"
-            >
-              Retry
-            </button>
-          </div>
+      <div className="flex items-center justify-center min-h-screen bg-luxury-black text-white">
+        <div className="text-center">
+          <p className="text-red-400 mb-4">Error loading articles: {error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="bg-green-ocean hover:bg-green-ocean-light text-white px-6 py-2 rounded-lg transition-colors"
+          >
+            Retry
+          </button>
         </div>
-        <Footer />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-luxury-black text-white">
-      <Header />
+    <div className="bg-luxury-black text-white">
       {/* Hero Section */}
       <section className="py-20 bg-gradient-to-br from-luxury-black via-luxury-black-light to-luxury-black">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -175,7 +164,6 @@ export default function ArticlesPage() {
           </div>
         </div>
       </section>
-      <Footer />
     </div>
   )
 }

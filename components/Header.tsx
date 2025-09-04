@@ -10,11 +10,6 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const pathname = usePathname()
 
-  // Don't render header on admin pages
-  if (pathname?.startsWith('/admin')) {
-    return null
-  }
-
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10)
@@ -23,6 +18,11 @@ export default function Header() {
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
+
+  // Don't render header on admin pages or project detail pages
+  if (pathname?.startsWith('/admin') || pathname?.match(/^\/projects\/[^/]+$/)) {
+    return null
+  }
 
   const navigation = [
     { name: 'Home', href: '/' },
