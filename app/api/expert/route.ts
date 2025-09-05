@@ -14,139 +14,39 @@ interface LLMSettings {
   maxTokens: number;
 }
 
-// Enhanced AI response function with database integration
+// Enhanced AI response function with Dubai knowledge focus
 async function getEnhancedAIResponse(message: string, context?: string): Promise<string> {
   try {
-    console.log('Enhanced AI Response: Starting database queries...');
-    
-    // Get real estate data from database with connection error handling
-    let projects: any[] = [];
-    let developers: any[] = [];
-    
-    try {
-      console.log('Enhanced AI Response: Querying projects...');
-      projects = await query('SELECT * FROM projects ORDER BY created_at DESC LIMIT 20') as any[];
-      console.log('Enhanced AI Response: Projects found:', projects.length);
-      
-      console.log('Enhanced AI Response: Querying developers...');
-      developers = await query('SELECT * FROM developers WHERE status = "Active"') as any[];
-      console.log('Enhanced AI Response: Developers found:', developers.length);
-    } catch (dbError) {
-      console.warn('Enhanced AI Response: Database query failed, using fallback data:', dbError);
-      // Use fallback data when database is unavailable
-      projects = [];
-      developers = [];
-    }
-    
-    // Contact info will be configured through admin settings
-    const contactInfo = {
-      phone: null,
-      email: null,
-      address: 'Dubai, UAE'
-    };
-    
-    // Build comprehensive real estate context
-    const realEstateContext = {
-      projects: projects.map((p: any) => ({
-        name: p.name,
-        developer: p.developer,
-        location: p.location,
-        price: p.price || p.starting_price,
-        type: p.type,
-        bedrooms: p.bedrooms,
-        bathrooms: p.bathrooms,
-        area: p.area,
-        status: p.status,
-        project_type: p.project_type,
-        features: p.features ? JSON.parse(p.features) : [],
-        amenities: p.amenities ? JSON.parse(p.amenities) : [],
-        description: p.description,
-        image: p.image
-      })),
-      developers: developers.map((d: any) => ({
-        name: d.name,
-        description: d.description,
-        established: d.established,
-        projects_count: d.projects_count,
-        location: d.location,
-        website: d.website
-      })),
-      totalProjects: projects.length,
-      availableProjects: projects.filter((p: any) => p.status === 'Available').length,
-      underConstructionProjects: projects.filter((p: any) => p.status === 'Under Construction').length,
-      contactInfo: contactInfo
-    };
-
-    // Get LLM settings
+    // Get LLM settings and system prompt from database
     const settings = await getLLMSettings();
+    const aiSettings = await getAISettings();
     
-    // Professional real estate expert prompt
-    const expertPrompt = `You are a professional real estate consultant specializing in Dubai properties. You work for Premium Choice Real Estate and have access to the company's exclusive property portfolio.
+    // Use system prompt from database or fallback to Dubai-focused default
+    let systemPrompt = aiSettings?.system_prompt || `You are a Dubai real estate expert with comprehensive knowledge about:
+- Dubai's neighborhoods, districts, and areas
+- Property market trends and investment opportunities
+- Legal requirements for property purchase in Dubai
+- Visa and residency options through real estate investment
+- Dubai's infrastructure, amenities, and lifestyle
+- Market analysis and property valuation
+- Investment strategies and ROI calculations
 
-CRITICAL INSTRUCTIONS:
-- ONLY discuss properties from the database provided below
-- Be professional, concise, and direct
-- Always reference specific project names, developers, and exact details from the database
-- If asked about properties not in your database, politely redirect to your available portfolio
-- Provide brief, focused responses without excessive details
-- Include contact information only when specifically requested
+Provide detailed, accurate information about Dubai's real estate market without promoting specific projects unless directly asked.`;
+    
+    // Build the complete prompt with system prompt + user message
+    const expertPrompt = `${systemPrompt}
 
-COMPANY PORTFOLIO:
-Total Projects: ${realEstateContext.totalProjects}
-Available Properties: ${realEstateContext.availableProjects}
-Under Construction: ${realEstateContext.underConstructionProjects}
+USER QUESTION: ${message}
 
-DEVELOPER PARTNERS:
-${realEstateContext.developers.map(d => `• ${d.name} - ${d.description}`).join('\n')}
+Please provide a helpful, professional response based on your expertise about Dubai's real estate market.`;
 
-AVAILABLE PROJECTS:
-${realEstateContext.projects.slice(0, 10).map(p => 
-  `• ${p.name} by ${p.developer}
-    📍 ${p.location}
-    🏠 ${p.type} | ${p.bedrooms}BR | ${p.bathrooms}BA | ${p.area} sq ft
-    💰 ${p.price || 'Price on request'}
-    📋 Status: ${p.status}
-    🖼️ Image: ${p.image || 'No image available'}
-    ${p.description ? `📝 ${p.description.substring(0, 100)}...` : ''}`
-).join('\n\n')}
-
-CONTACT: Phone: ${realEstateContext.contactInfo.phone} | Email: ${realEstateContext.contactInfo.email}
-
-USER QUESTION: "${message}"
-
-RESPONSE GUIDELINES:
-1. Keep responses concise and professional
-2. Reference specific projects from the database only
-3. Provide exact project names, developers, and key details
-4. Suggest 1-2 relevant properties maximum
-5. If no relevant projects in database, redirect to available options
-6. No generic market advice - focus on actual portfolio
-7. **IMPORTANT: Do NOT include any image URLs or [IMAGE:] tags in your responses**
-
-**EXAMPLE RESPONSE FORMAT:**
-"I recommend **Dubai Hills Estate** by Emaar Properties in Dubai Hills. This luxury 3BR villa offers 2,200 sq ft with golf course views for AED 2,500,000.
-
-The property features premium finishes and smart home technology..."
-
-Remember: Only discuss the specific properties listed in the database above. Focus on text-based descriptions without any image references.`;
-
-    console.log('Enhanced AI Response: Getting LLM settings...');
-    const llmSettings = await getLLMSettings();
-    console.log('Enhanced AI Response: LLM settings retrieved:', { 
-      provider: llmSettings.provider, 
-      model: llmSettings.model,
-      hasApiKey: !!llmSettings.apiKey 
-    });
-
-    console.log('Enhanced AI Response: Calling LLM...');
-    // Call the LLM
-    const response = await callLLM(llmSettings, expertPrompt);
-    console.log('Enhanced AI Response: LLM response received, length:', response?.length || 0);
+    console.log('🤖 Calling LLM with Dubai-focused prompt');
+    const response = await callLLM(settings, expertPrompt);
+    
     return response;
   } catch (error) {
-    console.error('Enhanced AI Response Error:', error);
-    console.log('Enhanced AI Response: Falling back to local response');
-    return getLocalRealEstateResponse(message);
+    console.error('❌ Error in getEnhancedAIResponse:', error);
+    return getFallbackResponse(message);
   }
 }
 
@@ -154,59 +54,95 @@ Remember: Only discuss the specific properties listed in the database above. Foc
 function getLocalRealEstateResponse(message: string): string {
   const lowerMessage = message.toLowerCase();
   
-  // Real estate specific responses
+  // Real estate specific responses focused on Dubai knowledge
   if (lowerMessage.includes('project') || lowerMessage.includes('property')) {
-    return `Here is the available project in our portfolio:
+    return `Dubai's property market offers diverse options across all segments:
 
-**LUME Residences by S&S Developer**
-📍 **Location:** Jumeirah Village Circle, Dubai
-🏠 **Type:** 1BR | 1BA Apartment
-💰 **Price:** On Request
-📋 **Status:** Available
+**🏢 Property Types:**
+• Luxury apartments in Downtown Dubai and Marina
+• Family villas in Arabian Ranches and Emirates Hills
+• Affordable housing in JVC and International City
+• Commercial properties in Business Bay and DIFC
 
-This modern development offers contemporary living in one of Dubai's most sought-after communities. What specific details would you like to know about this project?`;
+**📍 Popular Areas:**
+• **Downtown Dubai** - Iconic skyline, Burj Khalifa vicinity
+• **Dubai Marina** - Waterfront living, high-rise towers
+• **Business Bay** - Central location, business hub
+• **JVC** - Family-friendly, affordable options
+
+What type of property are you interested in?`;
   }
   
   if (lowerMessage.includes('developer') || lowerMessage.includes('builder')) {
-    return `We work with Dubai's most reputable developers including Emaar, DAMAC, Sobha Realty, and other established names. Each developer brings unique expertise and quality standards. Would you like to know about specific developers or their current projects?`;
+    return `Dubai's real estate market features world-class developers:
+
+**🏗️ Major Developers:**
+• **Emaar** - Downtown Dubai, Dubai Hills, Arabian Ranches
+• **DAMAC** - Luxury developments, DAMAC Hills
+• **Sobha Realty** - Premium quality, Sobha Hartland
+• **Dubai Properties** - JBR, Business Bay developments
+• **Nakheel** - Palm Jumeirah, The World Islands
+
+Each developer has distinct architectural styles and quality standards. Would you like to know about specific developers or areas they focus on?`;
   }
   
   if (lowerMessage.includes('investment') || lowerMessage.includes('roi')) {
-    return `As a real estate investment expert, I can guide you through Dubai's lucrative property market. Our portfolio includes both ready properties for immediate rental income and off-plan projects for capital appreciation.
+    return `Dubai's real estate investment market offers excellent opportunities:
 
-Key investment highlights:
-• Ready Properties: Immediate rental yields of 6-8% annually
-• Off-Plan Projects: Potential 15-25% capital appreciation
-• Prime Locations: Business Bay, Downtown, Dubai Marina, JVC
-• Developer Partnerships: Established relationships with top-tier developers
+**💰 Investment Highlights:**
+• **High Rental Yields:** 6-10% annually depending on area
+• **No Property Tax:** 100% ownership for expats
+• **Capital Appreciation:** Strong historical growth
+• **Golden Visa:** 10-year residency through property investment
 
-I recommend focusing on high-yield areas and emerging neighborhoods for optimal returns.
+**🎯 Best Investment Areas:**
+• **Business Bay** - 7-9% yields, central location
+• **JVC** - 8-10% yields, family-friendly
+• **Dubai South** - 9-12% yields, future growth potential
+• **Downtown Dubai** - Premium location, stable returns
 
-Would you like me to analyze specific investment opportunities?`;
+Would you like detailed analysis of specific investment strategies?`;
   }
   
   if (lowerMessage.includes('location') || lowerMessage.includes('area')) {
-    return `Dubai offers diverse neighborhoods, each with unique advantages:
+    return `Dubai's neighborhoods offer unique lifestyle advantages:
 
-**Premium Areas**: Downtown Dubai, Dubai Marina, Palm Jumeirah
-**Emerging Hotspots**: Dubai South, Dubailand, JVC, Arjan
-**Family-Friendly**: Arabian Ranches, The Springs, Dubai Hills
-**Business Districts**: Business Bay, DIFC, JLT
+**🌟 Premium Areas:**
+• **Downtown Dubai** - Urban lifestyle, world-class dining
+• **Dubai Marina** - Waterfront living, beach access
+• **Palm Jumeirah** - Exclusive island living, luxury resorts
 
-Our portfolio spans these prime locations with projects ranging from luxury villas to modern apartments. Which location interests you most?`;
+**🏡 Family Communities:**
+• **Arabian Ranches** - Golf course community, top schools
+• **Dubai Hills** - Modern master-planned community
+• **The Springs/Meadows** - Established, mature landscaping
+
+**💼 Business Districts:**
+• **Business Bay** - Central, high-rise living
+• **DIFC** - Financial hub, upscale dining
+• **JLT** - Established business community
+
+Which lifestyle or location type interests you most?`;
   }
   
   // Default expert response
-  return `As your real estate expert, I'm here to help you navigate Dubai's dynamic property market. I have access to our complete portfolio of premium projects from top developers.
+  return `As your Dubai real estate expert, I'm here to help you navigate this dynamic market with comprehensive knowledge about:
 
-I can assist you with:
-🏢 **Property Selection** - Find the perfect match for your needs
-💰 **Investment Analysis** - ROI calculations and market insights  
-🏗️ **Developer Insights** - Track records and project quality
-📍 **Location Guidance** - Area analysis and future growth potential
-📋 **Market Trends** - Current pricing and demand patterns
+🏙️ **Market Expertise:**
+• Neighborhood analysis and lifestyle matching
+• Investment strategies and ROI calculations
+• Legal requirements and visa options
+• Market trends and pricing insights
+• Developer track records and project quality
 
-What specific aspect of real estate would you like to explore?`;
+🎯 **I can help you with:**
+• Finding the right area for your lifestyle
+• Understanding investment opportunities
+• Navigating the buying process
+• Analyzing market trends and pricing
+• Connecting with trusted professionals
+
+What specific aspect of Dubai real estate would you like to explore?`;
 }
 
 async function getContactSettings() {
@@ -258,6 +194,24 @@ async function getLLMSettings(): Promise<LLMSettings> {
       temperature: 0.7,
       maxTokens: 1500
     };
+  }
+}
+
+async function getAISettings(): Promise<any> {
+  try {
+    const settings = await query(`
+      SELECT * FROM ai_api_settings ORDER BY created_at DESC LIMIT 1
+    `) as any[];
+
+    if (settings.length === 0) {
+      console.warn('No AI settings found in database');
+      return null;
+    }
+
+    return settings[0];
+  } catch (error) {
+    console.warn('Error fetching AI settings from database:', error instanceof Error ? error.message : String(error));
+    return null;
   }
 }
 

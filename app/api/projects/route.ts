@@ -49,7 +49,11 @@ export async function GET(request: NextRequest) {
         }
       ];
       
-      return NextResponse.json(testProjects);
+      const response = NextResponse.json(testProjects);
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+    return response;
     }
     
     // Transform the data to match the expected format for the home page
@@ -80,7 +84,11 @@ export async function GET(request: NextRequest) {
     });
     
     console.log(`✅ Returning ${transformedProjects.length} transformed projects`);
-    return NextResponse.json(transformedProjects);
+    const response = NextResponse.json(transformedProjects);
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+    return response;
 
   } catch (error) {
     console.error('❌ Error in projects API:', error);
